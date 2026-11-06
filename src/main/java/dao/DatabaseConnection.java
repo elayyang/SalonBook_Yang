@@ -4,6 +4,7 @@ package com.salonbook.dao;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class DatabaseConnection {
 
@@ -13,10 +14,17 @@ public class DatabaseConnection {
 
         Connection connection = DriverManager.getConnection(URL);
 
-        try (var statement = connection.createStatement()) {
-            statement.execute("PRAGMA foreign_keys = ON");
-        }
+        try (Statement statement = connection.createStatement()) {
 
-        return connection;
+            // Enable SQLite Foreign Key Constraints
+            statement.execute("PRAGMA foreign_keys = ON");
+
+            return connection;
+
+        } catch (SQLException e) {
+
+            connection.close();
+            throw e;
+        }
     }
 }

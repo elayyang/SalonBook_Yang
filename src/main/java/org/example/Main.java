@@ -1,44 +1,58 @@
 
 package com.salonbook;
 
-import com.salonbook.dao.DatabaseConnection;
+import com.salonbook.dao.DatabaseInitializer;
 import com.salonbook.dao.UserDao;
-import com.salonbook.ui.Menu;
+import com.salonbook.ui.Authentication;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Scanner;
 
 public class Main {
 
     public static void main(String[] args) {
 
-        System.out.println("====================================");
-        System.out.println("       WELCOME TO SALONBOOK");
-        System.out.println("====================================");
+        System.out.println("========================================");
+        System.out.println("       WELCOME TO SALONBOOK SYSTEM");
+        System.out.println("========================================");
 
-        // CHECK DATABASE CONNECTION
-        try (Connection connection = DatabaseConnection.getConnection()) {
+        // STEP 1: INITIALIZE DATABASE
+        try {
 
-            System.out.println("Database connected successfully!");
+            DatabaseInitializer.initializeDatabase();
 
-        } catch (SQLException e) {
-            System.out.println("Database connection failed: " + e.getMessage());
+            System.out.println("Database initialization completed!");
+
+        } catch (RuntimeException e) {
+
+            System.out.println("Unable to start SalonBook.");
+            System.out.println("Database Error: " + e.getMessage());
+
             return;
         }
 
-        // CREATE USER TABLE
+        // STEP 2: INSTANTIATE DAO
         UserDao userDao = new UserDao();
-        userDao.createTable();
 
-        // START APPLICATION
+        // STEP 3: CREATE ONE SHARED SCANNER
         Scanner scanner = new Scanner(System.in);
 
-        Menu menu = new Menu(userDao, scanner);
-        menu.showMainMenu();
+        // STEP 4: INSTANTIATE AUTHENTICATION
+        Authentication authentication =
+                new Authentication(userDao, scanner);
 
-        scanner.close();
+        // STEP 5: DELEGATE EXECUTION TO AUTHENTICATION
+        try {
 
-        System.out.println("\nSalonBook application closed.");
+            authentication.start();
+
+        } finally {
+
+            // CLOSE SHARED SCANNER WHEN APPLICATION EXITS
+            scanner.close();
+
+            System.out.println("\n========================================");
+            System.out.println("     SALONBOOK APPLICATION CLOSED");
+            System.out.println("========================================");
+        }
     }
 }

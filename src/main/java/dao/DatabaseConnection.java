@@ -16,7 +16,7 @@ public class DatabaseConnection {
 
         try (Statement statement = connection.createStatement()) {
 
-            // Enable SQLite Foreign Key Constraints
+            // Enable SQLite foreign key constraints
             statement.execute("PRAGMA foreign_keys = ON");
 
             return connection;
@@ -28,3 +28,4 @@ public class DatabaseConnection {
         }
     }
 }
+

@@ -12,10 +12,11 @@ public class Main {
     public static void main(String[] args) {
 
         System.out.println("========================================");
-        System.out.println("       WELCOME TO SALONBOOK SYSTEM");
+        System.out.println("              SALONBOOK");
+        System.out.println("     MULTI-SERVICE BOOKING SYSTEM");
         System.out.println("========================================");
 
-        // STEP 1: INITIALIZE DATABASE
+        // STEP 1: Initialize the database
         try {
 
             DatabaseInitializer.initializeDatabase();
@@ -30,29 +31,26 @@ public class Main {
             return;
         }
 
-        // STEP 2: INSTANTIATE DAO
+        // STEP 2: Create DAO
         UserDao userDao = new UserDao();
 
-        // STEP 3: CREATE ONE SHARED SCANNER
+        // STEP 3: Create one shared Scanner
         Scanner scanner = new Scanner(System.in);
 
-        // STEP 4: INSTANTIATE AUTHENTICATION
+        // STEP 4: Create Authentication
         Authentication authentication =
                 new Authentication(userDao, scanner);
 
-        // STEP 5: DELEGATE EXECUTION TO AUTHENTICATION
+        // STEP 5: Start the application
         try {
 
             authentication.start();
 
         } finally {
 
-            // CLOSE SHARED SCANNER WHEN APPLICATION EXITS
             scanner.close();
 
-            System.out.println("\n========================================");
-            System.out.println("     SALONBOOK APPLICATION CLOSED");
-            System.out.println("========================================");
+            System.out.println("SalonBook application closed.");
         }
     }
 }

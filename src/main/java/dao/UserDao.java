@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class UserDao {
 
@@ -27,7 +28,7 @@ public class UserDao {
             statement.setString(1, user.username());
             statement.setString(2, user.password());
             statement.setString(3, user.fullName());
-            statement.setString(4, user.role());
+            statement.setString(4, user.role().toUpperCase(Locale.ROOT));
 
             return statement.executeUpdate() > 0;
 
@@ -216,6 +217,33 @@ public class UserDao {
 
         } catch (SQLException e) {
             throw new RuntimeException("User deactivation failed: " + e.getMessage(), e);
+        }
+    }
+
+    // UPDATE USER ROLE AND STATUS
+    public boolean updateUserRoleAndStatus(
+            int userId,
+            String newRole,
+            String newStatus) {
+
+        String sql = """
+                UPDATE users
+                SET role = ?, status = ?
+                WHERE user_id = ?
+                """;
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, newRole.trim().toUpperCase(Locale.ROOT));
+            statement.setString(2, newStatus.trim().toUpperCase(Locale.ROOT));
+            statement.setInt(3, userId);
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "User role and status update failed: " + e.getMessage(), e);
         }
     }
 }

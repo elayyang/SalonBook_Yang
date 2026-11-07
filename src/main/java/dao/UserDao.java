@@ -13,6 +13,8 @@ import java.util.Locale;
 
 public class UserDao {
 
+    private final ActivityLogDao activityLogDao = new ActivityLogDao();
+
     // REGISTER USER
     public boolean registerUser(User user) {
 
@@ -171,15 +173,16 @@ public class UserDao {
             }
 
         } catch (SQLException e) {
-            throw new RuntimeException("Unable to retrieve pending users: "
-                    + e.getMessage(), e);
+            throw new RuntimeException(
+                    "Unable to retrieve pending users: " + e.getMessage(), e
+            );
         }
 
         return users;
     }
 
     // APPROVE USER
-    public boolean approveUser(int userId) {
+    public boolean approveUser(int userId, int adminId) {
 
         String sql = """
                 UPDATE users
@@ -192,7 +195,17 @@ public class UserDao {
 
             statement.setInt(1, userId);
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+                activityLogDao.logAction(
+                        adminId,
+                        "USER_APPROVED",
+                        "Admin " + adminId + " approved User " + userId
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
             throw new RuntimeException("User approval failed: " + e.getMessage(), e);
@@ -200,7 +213,7 @@ public class UserDao {
     }
 
     // DEACTIVATE USER
-    public boolean deactivateUser(int userId) {
+    public boolean deactivateUser(int userId, int adminId) {
 
         String sql = """
                 UPDATE users
@@ -213,10 +226,23 @@ public class UserDao {
 
             statement.setInt(1, userId);
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+                activityLogDao.logAction(
+                        adminId,
+                        "USER_UPDATED",
+                        "Admin " + adminId +
+                                " deactivated User " + userId
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
-            throw new RuntimeException("User deactivation failed: " + e.getMessage(), e);
+            throw new RuntimeException(
+                    "User deactivation failed: " + e.getMessage(), e
+            );
         }
     }
 
@@ -224,7 +250,11 @@ public class UserDao {
     public boolean updateUserRoleAndStatus(
             int userId,
             String newRole,
-            String newStatus) {
+            String newStatus,
+            int adminId) {
+
+        String normalizedRole = newRole.trim().toUpperCase(Locale.ROOT);
+        String normalizedStatus = newStatus.trim().toUpperCase(Locale.ROOT);
 
         String sql = """
                 UPDATE users
@@ -235,15 +265,55 @@ public class UserDao {
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setString(1, newRole.trim().toUpperCase(Locale.ROOT));
-            statement.setString(2, newStatus.trim().toUpperCase(Locale.ROOT));
+            statement.setString(1, normalizedRole);
+            statement.setString(2, normalizedStatus);
             statement.setInt(3, userId);
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+                activityLogDao.logAction(
+                        adminId,
+                        "USER_UPDATED",
+                        "Admin " + adminId +
+                                " updated User " + userId +
+                                " role to " + normalizedRole +
+                                " and status to " + normalizedStatus
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
             throw new RuntimeException(
-                    "User role and status update failed: " + e.getMessage(), e);
+                    "User role and status update failed: " + e.getMessage(), e
+            );
         }
+    }
+
+    // BACKWARD-COMPATIBLE APPROVAL METHOD
+    public boolean approveUser(int userId) {
+        return approveUser(userId, getAdminIdPlaceholder());
+    }
+
+    // BACKWARD-COMPATIBLE DEACTIVATION METHOD
+    public boolean deactivateUser(int userId) {
+        return deactivateUser(userId, getAdminIdPlaceholder());
+    }
+
+    // BACKWARD-COMPATIBLE UPDATE METHOD
+    public boolean updateUserRoleAndStatus(
+            int userId,
+            String newRole,
+            String newStatus) {
+
+        return updateUserRoleAndStatus(
+                userId, newRole, newStatus, getAdminIdPlaceholder()
+        );
+    }
+
+    // TEMPORARY PLACEHOLDER
+    private int getAdminIdPlaceholder() {
+        return 1;
     }
 }

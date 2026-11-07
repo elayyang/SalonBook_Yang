@@ -2,7 +2,9 @@
 package com.salonbook.ui;
 
 import com.salonbook.dao.UserDao;
+import com.salonbook.dao.ActivityLogDao;
 import com.salonbook.model.User;
+import com.salonbook.model.ActivityLog;
 
 import java.util.List;
 import java.util.Scanner;
@@ -10,10 +12,12 @@ import java.util.Scanner;
 public class AdminMenu {
 
     private final UserDao userDao;
+    private final ActivityLogDao activityLogDao;
     private final Scanner scanner;
 
     public AdminMenu(UserDao userDao, Scanner scanner) {
         this.userDao = userDao;
+        this.activityLogDao = new ActivityLogDao();
         this.scanner = scanner;
     }
 
@@ -33,7 +37,8 @@ public class AdminMenu {
             System.out.println("[2] View Pending Registrations");
             System.out.println("[3] Approve User Account");
             System.out.println("[4] Update User Role and Status");
-            System.out.println("[5] Logout");
+            System.out.println("[5] View System Audit Logs");
+            System.out.println("[6] Logout");
             System.out.println("----------------------------------------");
 
             int choice = readIntInput("Enter choice: ");
@@ -49,7 +54,7 @@ public class AdminMenu {
                     break;
 
                 case 3:
-                    approveUserAccount();
+                    approveUserAccount(admin);
                     break;
 
                 case 4:
@@ -57,12 +62,16 @@ public class AdminMenu {
                     break;
 
                 case 5:
+                    viewSystemAuditLogs(admin);
+                    break;
+
+                case 6:
                     running = false;
                     System.out.println("Administrator logged out.");
                     break;
 
                 default:
-                    System.out.println("Invalid choice. Please select 1-5.");
+                    System.out.println("Invalid choice. Please select 1-6.");
             }
         }
     }
@@ -88,7 +97,7 @@ public class AdminMenu {
     }
 
     // APPROVE USER ACCOUNT
-    private void approveUserAccount() {
+    private void approveUserAccount(User admin) {
 
         System.out.println("\n========== APPROVE USER ACCOUNT ==========");
 
@@ -114,24 +123,35 @@ public class AdminMenu {
                 .anyMatch(user -> user.userId() == userId);
 
         if (!exists) {
-            System.out.println("User ID not found in pending registrations.");
+            System.out.println(
+                    "User ID not found in pending registrations."
+            );
             return;
         }
 
-        boolean approved = userDao.approveUser(userId);
+        boolean approved = userDao.approveUser(
+                userId,
+                admin.userId()
+        );
 
         if (approved) {
-            System.out.println("\nSUCCESS! User account has been approved.");
+            System.out.println(
+                    "\nSUCCESS! User account has been approved."
+            );
             System.out.println("Approved User ID: " + userId);
         } else {
-            System.out.println("Unable to approve account. Please try again.");
+            System.out.println(
+                    "Unable to approve account. Please try again."
+            );
         }
     }
 
     // UPDATE USER ROLE AND STATUS
     private void updateUserAccount(User currentAdmin) {
 
-        System.out.println("\n========== UPDATE USER ROLE AND STATUS ==========");
+        System.out.println(
+                "\n========== UPDATE USER ROLE AND STATUS =========="
+        );
 
         List<User> users = userDao.getAllUsers();
 
@@ -140,12 +160,10 @@ public class AdminMenu {
             return;
         }
 
-        // Display all users
         displayUserTable(users);
 
         System.out.println("\nEnter 0 at any step to cancel.");
 
-        // STEP 1: SELECT USER ID
         int targetUserId = readIntInput("Enter Target User ID: ");
 
         if (targetUserId == 0) {
@@ -153,7 +171,6 @@ public class AdminMenu {
             return;
         }
 
-        // STEP 2: VERIFY USER EXISTS
         User selectedUser = users.stream()
                 .filter(user -> user.userId() == targetUserId)
                 .findFirst()
@@ -164,7 +181,7 @@ public class AdminMenu {
             return;
         }
 
-        // STEP 3: SELF-EDIT SECURITY RESTRICTION
+        // SELF-EDIT SECURITY RESTRICTION
         if (targetUserId == currentAdmin.userId()) {
 
             System.out.println(
@@ -180,7 +197,6 @@ public class AdminMenu {
         System.out.println("Current Role: " + selectedUser.role());
         System.out.println("Current Status: " + selectedUser.status());
 
-        // STEP 4: SELECT NEW ROLE
         String newRole = readValidRole();
 
         if (newRole == null) {
@@ -188,7 +204,6 @@ public class AdminMenu {
             return;
         }
 
-        // STEP 5: SELECT NEW STATUS
         String newStatus = readValidStatus();
 
         if (newStatus == null) {
@@ -196,7 +211,6 @@ public class AdminMenu {
             return;
         }
 
-        // STEP 6: CONFIRM UPDATE
         System.out.println("\n========== UPDATE SUMMARY ==========");
         System.out.println("Target User ID : " + targetUserId);
         System.out.println("New Role       : " + newRole);
@@ -212,15 +226,17 @@ public class AdminMenu {
         }
 
         if (confirmation != 1) {
-            System.out.println("Invalid confirmation. Update cancelled.");
+            System.out.println(
+                    "Invalid confirmation. Update cancelled."
+            );
             return;
         }
 
-        // STEP 7: UPDATE DATABASE
         boolean updated = userDao.updateUserRoleAndStatus(
                 targetUserId,
                 newRole,
-                newStatus
+                newStatus,
+                currentAdmin.userId()
         );
 
         if (updated) {
@@ -236,6 +252,190 @@ public class AdminMenu {
 
             System.out.println("Unable to update user account.");
         }
+    }
+
+    // SYSTEM AUDIT LOG MENU
+    private void viewSystemAuditLogs(User admin) {
+
+        boolean viewing = true;
+
+        while (viewing) {
+
+            System.out.println("\n========== SYSTEM AUDIT LOGS ==========");
+            System.out.println("[1] View All System Logs");
+            System.out.println("[2] Filter Logs by User ID");
+            System.out.println("[3] Clear Historical Logs");
+            System.out.println("[0] Back to Admin Menu");
+
+            int choice = readIntInput("Enter choice: ");
+
+            switch (choice) {
+
+                case 1:
+
+                    System.out.println(
+                            "\n========== ALL SYSTEM LOGS =========="
+                    );
+
+                    displayActivityLogs(
+                            activityLogDao.getAllLogs()
+                    );
+
+                    break;
+
+                case 2:
+
+                    int userId = readIntInput(
+                            "Enter User ID to filter: "
+                    );
+
+                    if (userId <= 0) {
+                        System.out.println("Invalid User ID.");
+                        break;
+                    }
+
+                    System.out.println(
+                            "\n========== FILTERED SYSTEM LOGS =========="
+                    );
+
+                    displayActivityLogs(
+                            activityLogDao.getLogsByUserId(userId)
+                    );
+
+                    break;
+
+                case 3:
+
+                    clearHistoricalLogs(admin);
+                    break;
+
+                case 0:
+
+                    viewing = false;
+                    break;
+
+                default:
+
+                    System.out.println(
+                            "Invalid choice. Please select 0-3."
+                    );
+            }
+        }
+    }
+
+    // CLEAR HISTORICAL LOGS WITH CONFIRMATION
+    private void clearHistoricalLogs(User admin) {
+
+        System.out.println(
+                "\n========== CLEAR HISTORICAL LOGS =========="
+        );
+
+        System.out.println(
+                "WARNING: This will delete historical activity logs."
+        );
+
+        System.out.println(
+                "A record of this clearing action will be retained."
+        );
+
+        System.out.println("[1] Confirm");
+        System.out.println("[0] Cancel");
+
+        int confirmation = readIntInput("Enter choice: ");
+
+        if (confirmation == 1) {
+
+            try {
+
+                activityLogDao.clearAllLogs(admin.userId());
+
+            } catch (RuntimeException e) {
+
+                System.out.println(
+                        "Unable to clear historical logs: "
+                                + e.getMessage()
+                );
+            }
+
+        } else if (confirmation == 0) {
+
+            System.out.println("Log clearing cancelled.");
+
+        } else {
+
+            System.out.println(
+                    "Invalid choice. No logs were deleted."
+            );
+        }
+    }
+
+    // DISPLAY ACTIVITY LOG TABLE
+    private void displayActivityLogs(List<ActivityLog> logs) {
+
+        if (logs.isEmpty()) {
+            System.out.println("No activity logs found.");
+            return;
+        }
+
+        String border =
+                "+-------+----------+--------------------+-------------------------------------+----------------------+";
+
+        System.out.println(border);
+
+        System.out.printf(
+                "| %-5s | %-8s | %-18s | %-35s | %-20s |%n",
+                "ID",
+                "USER ID",
+                "ACTION TYPE",
+                "DESCRIPTION",
+                "TIMESTAMP"
+        );
+
+        System.out.println(border);
+
+        for (ActivityLog log : logs) {
+
+            String userId = log.userId() == null
+                    ? "N/A"
+                    : String.valueOf(log.userId());
+
+            String description = log.description() == null
+                    ? ""
+                    : log.description();
+
+            String actionType = log.actionType() == null
+                    ? ""
+                    : log.actionType();
+
+            String timestamp = log.timestamp() == null
+                    ? ""
+                    : log.timestamp();
+
+            if (description.length() > 35) {
+                description = description.substring(0, 32) + "...";
+            }
+
+            if (actionType.length() > 18) {
+                actionType = actionType.substring(0, 15) + "...";
+            }
+
+            if (timestamp.length() > 20) {
+                timestamp = timestamp.substring(0, 20);
+            }
+
+            System.out.printf(
+                    "| %-5d | %-8s | %-18s | %-35s | %-20s |%n",
+                    log.id(),
+                    userId,
+                    actionType,
+                    description,
+                    timestamp
+            );
+        }
+
+        System.out.println(border);
+
+        System.out.println("Total logs: " + logs.size());
     }
 
     // INPUT VALIDATION: INTEGER
@@ -266,29 +466,39 @@ public class AdminMenu {
         while (true) {
 
             System.out.println("\nAvailable Roles:");
-            System.out.println("[1] ADMIN");
+            System.out.println("[1] ADMINISTRATOR");
             System.out.println("[2] RECEPTIONIST");
             System.out.println("[3] SALON STAFF");
             System.out.println("[0] Cancel");
 
             System.out.print("Enter New Role: ");
 
-            String role = scanner.nextLine().trim().toUpperCase();
+            String role = scanner.nextLine()
+                    .trim()
+                    .toUpperCase();
 
-            if (role.equals("0")) {
-                return null;
+            switch (role) {
+
+                case "1":
+                case "ADMINISTRATOR":
+                    return "ADMINISTRATOR";
+
+                case "2":
+                case "RECEPTIONIST":
+                    return "RECEPTIONIST";
+
+                case "3":
+                case "SALON STAFF":
+                    return "SALON STAFF";
+
+                case "0":
+                    return null;
+
+                default:
+                    System.out.println(
+                            "INVALID ROLE! Please select a valid role."
+                    );
             }
-
-            if (role.equals("ADMIN")
-                    || role.equals("RECEPTIONIST")
-                    || role.equals("SALON STAFF")) {
-
-                return role;
-            }
-
-            System.out.println(
-                    "INVALID ROLE! Please enter ADMIN, RECEPTIONIST, or SALON STAFF."
-            );
         }
     }
 
@@ -304,21 +514,28 @@ public class AdminMenu {
 
             System.out.print("Enter New Status: ");
 
-            String status = scanner.nextLine().trim().toUpperCase();
+            String status = scanner.nextLine()
+                    .trim()
+                    .toUpperCase();
 
-            if (status.equals("0")) {
-                return null;
+            switch (status) {
+
+                case "1":
+                case "APPROVED":
+                    return "APPROVED";
+
+                case "2":
+                case "PENDING":
+                    return "PENDING";
+
+                case "0":
+                    return null;
+
+                default:
+                    System.out.println(
+                            "INVALID STATUS! Please select a valid status."
+                    );
             }
-
-            if (status.equals("APPROVED")
-                    || status.equals("PENDING")) {
-
-                return status;
-            }
-
-            System.out.println(
-                    "INVALID STATUS! Please enter APPROVED or PENDING."
-            );
         }
     }
 
@@ -330,13 +547,17 @@ public class AdminMenu {
             return;
         }
 
-        String border = "+-------+-----------------+--------------+------------+";
+        String border =
+                "+-------+-----------------+----------------+------------+";
 
         System.out.println(border);
 
         System.out.printf(
-                "| %-5s | %-15s | %-12s | %-10s |%n",
-                "ID", "USERNAME", "ROLE", "STATUS"
+                "| %-5s | %-15s | %-14s | %-10s |%n",
+                "ID",
+                "USERNAME",
+                "ROLE",
+                "STATUS"
         );
 
         System.out.println(border);
@@ -344,7 +565,7 @@ public class AdminMenu {
         for (User user : users) {
 
             System.out.printf(
-                    "| %-5d | %-15s | %-12s | %-10s |%n",
+                    "| %-5d | %-15s | %-14s | %-10s |%n",
                     user.userId(),
                     user.username(),
                     user.role(),

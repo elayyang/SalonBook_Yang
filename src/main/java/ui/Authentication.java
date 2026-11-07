@@ -2,6 +2,7 @@
 package com.salonbook.ui;
 
 import com.salonbook.dao.UserDao;
+import com.salonbook.dao.ActivityLogDao;
 import com.salonbook.model.User;
 
 import java.util.Scanner;
@@ -9,11 +10,13 @@ import java.util.Scanner;
 public class Authentication {
 
     private final UserDao userDao;
+    private final ActivityLogDao activityLogDao;
     private final Scanner scanner;
 
     public Authentication(UserDao userDao, Scanner scanner) {
         this.userDao = userDao;
         this.scanner = scanner;
+        this.activityLogDao = new ActivityLogDao();
     }
 
     // MAIN AUTHENTICATION MENU
@@ -162,6 +165,16 @@ public class Authentication {
             }
 
             if (user.isApproved()) {
+
+                // RECORD SUCCESSFUL LOGIN
+                activityLogDao.logAction(
+                        user.userId(),
+                        "USER_LOGIN",
+                        "User " + user.username()
+                                + " (ID: " + user.userId()
+                                + ") logged in."
+                );
+
                 System.out.println("\nLogin successful!");
                 System.out.println("Welcome, " + user.fullName() + "!");
 
@@ -181,6 +194,8 @@ public class Authentication {
             AdminMenu adminMenu = new AdminMenu(userDao, scanner);
             adminMenu.start(user);
 
+            recordLogout(user);
+
         } else if (user.isReceptionist()) {
 
             receptionistMenu(user);
@@ -193,6 +208,20 @@ public class Authentication {
 
             System.out.println("Unrecognized account role.");
         }
+    }
+
+    // RECORD LOGOUT
+    private void recordLogout(User user) {
+
+        activityLogDao.logAction(
+                user.userId(),
+                "USER_LOGOUT",
+                "User " + user.username()
+                        + " (ID: " + user.userId()
+                        + ") logged out."
+        );
+
+        System.out.println("Logout recorded successfully.");
     }
 
     // RECEPTIONIST MENU
@@ -220,6 +249,7 @@ public class Authentication {
 
                 case "2":
                     running = false;
+                    recordLogout(user);
                     System.out.println("Receptionist logged out.");
                     break;
 
@@ -254,6 +284,7 @@ public class Authentication {
 
                 case "2":
                     running = false;
+                    recordLogout(user);
                     System.out.println("Salon Staff logged out.");
                     break;
 
